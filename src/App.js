@@ -1,6 +1,25 @@
 import React, { Component } from "react";
 import request from "axios";
 import daggy from "daggy";
+import { styled } from "styletron-react";
+
+const Block = styled("div", props => ({
+  ...props.css,
+  display: "block",
+}));
+
+const InlineBlock = styled("div", props => ({
+  ...props.css,
+  display: "inline-block",
+}));
+
+const Input = styled("input", props => ({
+  ...props.css,
+}));
+
+const Button = styled("button", props => ({
+  ...props.css,
+}));
 
 Array.prototype.sortBy = function(...args) {
   return [...this].sort(...args);
@@ -135,12 +154,6 @@ const sortByChanged = sortBy => state => ({
   sortBy,
 });
 
-const Block = props => <div {...props} style={{ display: "block" }} />;
-
-const InlineBlock = props => (
-  <div {...props} style={{ display: "inline-block" }} />
-);
-
 class App extends Component {
   state = {
     remoteFilms: RemoteData.NotAsked,
@@ -160,16 +173,37 @@ class App extends Component {
     const ESCAPE_KEY = 27;
     return (
       <Block>
-        <Block>
+        <Block
+          css={{
+            padding: "15px",
+            backgroundColor: "#f7f8fa",
+            borderBottomColor: "#d5dfe6",
+            borderBottomWidth: "1px",
+            borderBottomStyle: "solid",
+          }}
+        >
           <InlineBlock>
             <KeyDown
               keyCode={ESCAPE_KEY}
               onKeyDown={() => this.setState(closeDropdown)}
             />
             <ClickOutside onClickOutside={() => this.setState(closeDropdown)}>
-              <button onClick={() => this.setState(toggleDropdown)}>
-                Sort by
-              </button>
+              <Button
+                css={{
+                  fontSize: "15px",
+                  color: "#43596f",
+                  borderColor: "#d8dce1",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  borderRadius: "3px",
+                  padding: "10px",
+                  backgroundColor: "#f7f7f8",
+                  marginRight: "15px",
+                }}
+                onClick={() => this.setState(toggleDropdown)}
+              >
+                Sort by...
+              </Button>
               <div style={{ position: "relative" }}>
                 <div
                   style={{
@@ -205,7 +239,18 @@ class App extends Component {
             </ClickOutside>
           </InlineBlock>
           <InlineBlock>
-            <input
+            <Input
+              css={{
+                borderColor: "#d8dce1",
+                borderWidth: "1px",
+                borderStyle: "solid",
+                borderRadius: "3px",
+                color: "#43596f",
+                fontSize: "15px",
+                padding: "10px",
+                width: "100%",
+                display: "block",
+              }}
               type="text"
               value={this.state.searchInput}
               onChange={e => this.setState(searchInputChanged(e.target.value))}
@@ -213,12 +258,12 @@ class App extends Component {
             />
           </InlineBlock>
         </Block>
-        <InlineBlock>
+        <Block css={{ float: "left", width: "50%" }}>
           {this.state.remoteFilms.cata({
             NotAsked: () => "Loading",
             Loading: () => "Loading",
-            Success: data =>
-              data
+            Success: data => {
+              const filteredFilms = data
                 .sortBy((a, b) =>
                   this.state.sortBy.cata({
                     None: () => 0,
@@ -235,9 +280,16 @@ class App extends Component {
                     film.title
                       .toLowerCase()
                       .indexOf(this.state.searchInput.toLowerCase()) !== -1,
-                )
-                .map(film => (
+                );
+              if (filteredFilms.length > 0) {
+                return filteredFilms.map(film => (
                   <Block
+                    css={{
+                      borderBottomColor: "#f1f2f4",
+                      borderBottomWidth: "1px",
+                      borderBottomStyle: "solid",
+                      padding: "20px",
+                    }}
                     key={film.id}
                     onClick={() => this.setState(selectFilm(film))}
                   >
@@ -245,22 +297,39 @@ class App extends Component {
                     <InlineBlock>{film.title}</InlineBlock>
                     <InlineBlock>{film.releaseDate}</InlineBlock>
                   </Block>
-                )),
+                ));
+              } else {
+                return (
+                  <Block css={{ padding: "20px" }}>
+                    No movies with that title
+                  </Block>
+                );
+              }
+            },
             Failure: () => "Something went wrong!",
           })}
-        </InlineBlock>
-        <InlineBlock>
-          {this.state.selectedFilm.cata({
-            Nothing: () => "No movie selected",
-            Just: film => (
-              <Block>
-                <h1>{film.title}</h1>
-                <p>{film.openingCrawl}</p>
-                <p>Directed by: {film.director}</p>
-              </Block>
-            ),
-          })}
-        </InlineBlock>
+        </Block>
+        <Block css={{ float: "left", width: "50%" }}>
+          <Block
+            css={{
+              borderLeftColor: "#f1f2f4",
+              borderLeftWidth: "1px",
+              borderLeftStyle: "solid",
+              padding: "20px",
+            }}
+          >
+            {this.state.selectedFilm.cata({
+              Nothing: () => "No movie selected",
+              Just: film => (
+                <Block>
+                  <h1>{film.title}</h1>
+                  <p>{film.openingCrawl}</p>
+                  <p>Directed by: {film.director}</p>
+                </Block>
+              ),
+            })}
+          </Block>
+        </Block>
       </Block>
     );
   }
