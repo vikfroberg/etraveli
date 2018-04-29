@@ -3,9 +3,17 @@ import request from "axios";
 import daggy from "daggy";
 import { styled } from "styletron-react";
 
+// Router server side
+// Better loading handling
+
 const Block = styled("div", props => ({
   ...props.css,
   display: "block",
+}));
+
+const Flex = styled("div", props => ({
+  ...props.css,
+  display: "flex",
 }));
 
 const InlineBlock = styled("div", props => ({
@@ -14,10 +22,6 @@ const InlineBlock = styled("div", props => ({
 }));
 
 const Input = styled("input", props => ({
-  ...props.css,
-}));
-
-const Button = styled("button", props => ({
   ...props.css,
 }));
 
@@ -172,63 +176,127 @@ class App extends Component {
   render() {
     const ESCAPE_KEY = 27;
     return (
-      <Block>
-        <Block
+      <Flex css={{ flexDirection: "column", height: "100%" }}>
+        <Flex
           css={{
             padding: "15px",
             backgroundColor: "#f7f8fa",
             borderBottomColor: "#d5dfe6",
             borderBottomWidth: "1px",
             borderBottomStyle: "solid",
+            flexDirection: "row",
           }}
         >
-          <InlineBlock>
+          <Block css={{ flexShrink: 0 }}>
             <KeyDown
               keyCode={ESCAPE_KEY}
               onKeyDown={() => this.setState(closeDropdown)}
             />
             <ClickOutside onClickOutside={() => this.setState(closeDropdown)}>
-              <Button
+              <Block
                 css={{
                   fontSize: "15px",
                   color: "#43596f",
                   borderColor: "#d8dce1",
                   borderWidth: "1px",
                   borderStyle: "solid",
-                  borderRadius: "3px",
+                  borderRadius: "5px",
                   padding: "10px",
-                  backgroundColor: "#f7f7f8",
                   marginRight: "15px",
+                  cursor: "pointer",
+                  backgroundColor: this.state.dropdown ? "#e7edf7" : "#f7f7f8",
                 }}
                 onClick={() => this.setState(toggleDropdown)}
               >
                 Sort by...
-              </Button>
+              </Block>
               <div style={{ position: "relative" }}>
                 <div
                   style={{
-                    background: "#fff",
-                    padding: 10,
+                    backgroundColor: "#fff",
                     position: "absolute",
                     left: 0,
-                    top: 0,
-                    minWidth: 200,
+                    top: "10px",
+                    borderRadius: "5px",
+                    boxShadow: "0 0 6px rgba(0, 0, 0, .4)",
+                    minWidth: "240px",
+                    minHeight: "250px",
                     display: this.state.dropdown ? "block" : "none",
                   }}
                 >
-                  <Block>
-                    <InlineBlock>Sort by</InlineBlock>
-                    <InlineBlock onClick={() => this.setState(closeDropdown)}>
+                  <Block
+                    css={{
+                      borderBottomColor: "#e3e7eb",
+                      borderBottomWidth: "1px",
+                      borderBottomStyle: "solid",
+                    }}
+                  >
+                    <InlineBlock
+                      css={{
+                        padding: "10px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      Sort by
+                    </InlineBlock>
+                    <InlineBlock
+                      css={{
+                        padding: "10px",
+                        float: "right",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => this.setState(closeDropdown)}
+                    >
                       x
                     </InlineBlock>
                   </Block>
                   <Block>
                     <Block
+                      css={{
+                        borderBottomColor: "#f1f2f4",
+                        borderBottomWidth: "1px",
+                        borderBottomStyle: "solid",
+                        paddingLeft: "30px",
+                        paddingTop: "10px",
+                        paddingBottom: "10px",
+                        cursor: "pointer",
+                        backgroundColor:
+                          this.state.sortBy === Sort.None ? "#f8f8f9" : "#fff",
+                      }}
+                      onClick={() => this.setState(sortByChanged(Sort.None))}
+                    >
+                      None
+                    </Block>
+                    <Block
+                      css={{
+                        borderBottomColor: "#f1f2f4",
+                        borderBottomWidth: "1px",
+                        borderBottomStyle: "solid",
+                        paddingLeft: "30px",
+                        paddingTop: "10px",
+                        paddingBottom: "10px",
+                        cursor: "pointer",
+                        backgroundColor:
+                          this.state.sortBy === Sort.Episode
+                            ? "#f8f8f9"
+                            : "#fff",
+                      }}
                       onClick={() => this.setState(sortByChanged(Sort.Episode))}
                     >
                       Episode
                     </Block>
                     <Block
+                      css={{
+                        borderBottomColor: "#f1f2f4",
+                        borderBottomWidth: "1px",
+                        borderBottomStyle: "solid",
+                        paddingLeft: "30px",
+                        paddingTop: "10px",
+                        paddingBottom: "10px",
+                        cursor: "pointer",
+                        backgroundColor:
+                          this.state.sortBy === Sort.Year ? "#f8f8f9" : "#fff",
+                      }}
                       onClick={() => this.setState(sortByChanged(Sort.Year))}
                     >
                       Year
@@ -237,14 +305,14 @@ class App extends Component {
                 </div>
               </div>
             </ClickOutside>
-          </InlineBlock>
-          <InlineBlock>
+          </Block>
+          <Block css={{ flexGrow: 1 }}>
             <Input
               css={{
                 borderColor: "#d8dce1",
                 borderWidth: "1px",
                 borderStyle: "solid",
-                borderRadius: "3px",
+                borderRadius: "5px",
                 color: "#43596f",
                 fontSize: "15px",
                 padding: "10px",
@@ -256,81 +324,105 @@ class App extends Component {
               onChange={e => this.setState(searchInputChanged(e.target.value))}
               placeholder="Type to search..."
             />
-          </InlineBlock>
-        </Block>
-        <Block css={{ float: "left", width: "50%" }}>
-          {this.state.remoteFilms.cata({
-            NotAsked: () => "Loading",
-            Loading: () => "Loading",
-            Success: data => {
-              const filteredFilms = data
-                .sortBy((a, b) =>
-                  this.state.sortBy.cata({
-                    None: () => 0,
-                    Episode: () => a.episode - b.episode,
-                    Year: () => {
-                      const aDate = new Date(a.releaseDate);
-                      const bDate = new Date(b.releaseDate);
-                      return bDate > aDate ? -1 : bDate < aDate ? 1 : 0;
-                    },
-                  }),
-                )
-                .filter(
-                  film =>
-                    film.title
-                      .toLowerCase()
-                      .indexOf(this.state.searchInput.toLowerCase()) !== -1,
-                );
-              if (filteredFilms.length > 0) {
-                return filteredFilms.map(film => (
-                  <Block
-                    css={{
-                      borderBottomColor: "#f1f2f4",
-                      borderBottomWidth: "1px",
-                      borderBottomStyle: "solid",
-                      padding: "20px",
-                    }}
-                    key={film.id}
-                    onClick={() => this.setState(selectFilm(film))}
-                  >
-                    <InlineBlock>Episode {film.episode}</InlineBlock>
-                    <InlineBlock>{film.title}</InlineBlock>
-                    <InlineBlock>{film.releaseDate}</InlineBlock>
-                  </Block>
-                ));
-              } else {
-                return (
-                  <Block css={{ padding: "20px" }}>
-                    No movies with that title
-                  </Block>
-                );
-              }
-            },
-            Failure: () => "Something went wrong!",
-          })}
-        </Block>
-        <Block css={{ float: "left", width: "50%" }}>
+          </Block>
+        </Flex>
+        <Flex css={{ flex: 1 }}>
+          <Block css={{ flex: 1 }}>
+            {this.state.remoteFilms.cata({
+              NotAsked: () => "Loading",
+              Loading: () => "Loading",
+              Success: data => {
+                const filteredFilms = data
+                  .sortBy((a, b) =>
+                    this.state.sortBy.cata({
+                      None: () => 0,
+                      Episode: () => a.episode - b.episode,
+                      Year: () => {
+                        const aDate = new Date(a.releaseDate);
+                        const bDate = new Date(b.releaseDate);
+                        return bDate > aDate ? -1 : bDate < aDate ? 1 : 0;
+                      },
+                    }),
+                  )
+                  .filter(
+                    film =>
+                      film.title
+                        .toLowerCase()
+                        .indexOf(this.state.searchInput.toLowerCase()) !== -1,
+                  );
+                if (filteredFilms.length > 0) {
+                  return filteredFilms.map(film => (
+                    <Block
+                      css={{
+                        ":hover": { backgroundColor: "#f8f8f9" },
+                        borderBottomColor: "#ebecf0",
+                        borderBottomWidth: "1px",
+                        borderBottomStyle: "solid",
+                        padding: "20px",
+                        cursor: "pointer",
+                        backgroundColor: this.state.selectedFilm.cata({
+                          Just: selectedFilm =>
+                            film.id === selectedFilm.id ? "#f8f8f9" : "#fff",
+                          Nothing: () => "#fff",
+                        }),
+                      }}
+                      key={film.id}
+                      onClick={() => this.setState(selectFilm(film))}
+                    >
+                      <InlineBlock
+                        css={{
+                          marginRight: "25px",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Episode {film.episode}
+                      </InlineBlock>
+                      <InlineBlock css={{ fontWeight: "bold" }}>
+                        {film.title}
+                      </InlineBlock>
+                      <InlineBlock css={{ float: "right" }}>
+                        {film.releaseDate}
+                      </InlineBlock>
+                    </Block>
+                  ));
+                } else {
+                  return (
+                    <Block css={{ padding: "20px" }}>
+                      No movies with that title
+                    </Block>
+                  );
+                }
+              },
+              Failure: () => "Something went wrong!",
+            })}
+          </Block>
           <Block
             css={{
+              flex: 1,
               borderLeftColor: "#f1f2f4",
               borderLeftWidth: "1px",
               borderLeftStyle: "solid",
-              padding: "20px",
             }}
           >
-            {this.state.selectedFilm.cata({
-              Nothing: () => "No movie selected",
-              Just: film => (
-                <Block>
-                  <h1>{film.title}</h1>
-                  <p>{film.openingCrawl}</p>
-                  <p>Directed by: {film.director}</p>
-                </Block>
-              ),
-            })}
+            <Block
+              css={{
+                padding: "20px",
+              }}
+            >
+              {this.state.selectedFilm.cata({
+                Nothing: () => "No movie selected",
+                Just: film => (
+                  <Block>
+                    <h1>{film.title}</h1>
+                    <p>{film.openingCrawl}</p>
+                    <p>Directed by: {film.director}</p>
+                  </Block>
+                ),
+              })}
+            </Block>
           </Block>
-        </Block>
-      </Block>
+        </Flex>
+      </Flex>
     );
   }
 }
