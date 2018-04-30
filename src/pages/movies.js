@@ -3,11 +3,11 @@ import request from "axios";
 import Maybe from "../data/maybe";
 import RemoteData from "../data/remote-data";
 import daggy from "daggy";
-import queryString from "query-string";
+import qs from "query-string";
 import * as R from "ramda";
 import KeyDown, { ESCAPE_KEY } from "../components/key-down";
 import ClickOutside from "../components/click-outside";
-import { Link } from "../components/link";
+import { withRouter, Link } from "react-router-dom";
 import {
   FlexColumn,
   FlexRow,
@@ -114,11 +114,10 @@ class MoviesPage extends Component {
       parseInt(id, 10),
     );
 
-    const maybeSortBy = Maybe.from(
-      queryString.parseUrl(window.location.hash).query.sort,
-    ).map(Sort.fromString);
-
-    const sortBy = maybeSortBy.withDefault(Sort.None);
+    const query = qs.parse(this.props.location.search);
+    const sortBy = Maybe.from(query.sort)
+      .map(Sort.fromString)
+      .withDefault(Sort.None);
 
     return (
       <FlexColumn $css={{ height: "100%" }}>
@@ -203,36 +202,42 @@ function MovieListFailure() {
 
 function MovieListItem({ maybeSelectedId, movie }) {
   return (
-    <Link to={{ pathname: `/${movie.id}` }}>
-      <Block
-        $css={{
-          ":hover": { backgroundColor: "#f8f8f9" },
-          borderBottomColor: "#ebecf0",
-          borderBottomWidth: "1px",
-          borderBottomStyle: "solid",
-          padding: "20px",
-          cursor: "pointer",
-          backgroundColor: maybeSelectedId.cata({
-            Just: id => (movie.id === id ? "#f8f8f9" : "#fff"),
-            Nothing: () => "#fff",
-          }),
-        }}
-        key={movie.id}
-      >
-        <InlineBlock
-          $css={{
-            marginRight: "25px",
-            textTransform: "uppercase",
-          }}
-        >
-          Episode {movie.episode}
-        </InlineBlock>
-        <InlineBlock $css={{ fontWeight: "bold" }}>{movie.title}</InlineBlock>
-        <InlineBlock $css={{ float: "right" }}>
-          {dateToString(movie.releaseDate)}
-        </InlineBlock>
-      </Block>
-    </Link>
+    <WithRouter>
+      {({ location }) => (
+        <Link to={{ pathname: `/${movie.id}`, search: location.search }}>
+          <Block
+            key={movie.id}
+            $css={{
+              backgroundColor: maybeSelectedId.cata({
+                Just: id => (movie.id === id ? "#f8f8f9" : "#fff"),
+                Nothing: () => "#fff",
+              }),
+              borderBottomColor: "#ebecf0",
+              borderBottomWidth: "1px",
+              borderBottomStyle: "solid",
+              padding: "20px",
+              cursor: "pointer",
+              ":hover": { backgroundColor: "#f8f8f9" },
+            }}
+          >
+            <InlineBlock
+              $css={{
+                marginRight: "25px",
+                textTransform: "uppercase",
+              }}
+            >
+              Episode {movie.episode}
+            </InlineBlock>
+            <InlineBlock $css={{ fontWeight: "bold" }}>
+              {movie.title}
+            </InlineBlock>
+            <InlineBlock $css={{ float: "right" }}>
+              {dateToString(movie.releaseDate)}
+            </InlineBlock>
+          </Block>
+        </Link>
+      )}
+    </WithRouter>
   );
 }
 
@@ -445,7 +450,7 @@ function DropdownContentHeader({ children, onDissmiss }) {
 
 function DropdownContentItem({ active, children, param }) {
   return (
-    <Link to={{ query: { sort: param } }}>
+    <Link to={{ search: qs.stringify({ sort: param }) }}>
       <Block
         $css={{
           borderBottomColor: "#f1f2f4",
@@ -494,6 +499,10 @@ function SearchInput({ onChange, value }) {
 }
 
 // HELPERS
+
+const WithRouter = withRouter(({ children, location, match, history }) => {
+  return children({ location, match, history });
+});
 
 const maybeFind = R.curry((cb, xs) => {
   return Maybe.from(xs.find(cb));
