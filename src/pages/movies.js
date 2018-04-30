@@ -88,11 +88,6 @@ const closeDropdown = state => ({
   dropdown: false,
 });
 
-const sortByChanged = sortBy => state => ({
-  ...state,
-  sortBy,
-});
-
 // COMPONENT
 
 class MoviesPage extends Component {
@@ -127,7 +122,6 @@ class MoviesPage extends Component {
             sortBy={sortBy}
             onToggle={() => this.setState(toggleDropdown)}
             onDissmiss={() => this.setState(closeDropdown)}
-            onSortByChanged={sort => this.setState(sortByChanged(sort))}
           />
           <SearchInput
             value={this.state.searchInput}
@@ -336,7 +330,7 @@ function Header({ children }) {
 
 // DROPDOWN
 
-function Dropdown({ onDissmiss, onToggle, open, onSortByChanged, sortBy }) {
+function Dropdown({ onDissmiss, onToggle, open, sortBy }) {
   return (
     <Fragment>
       <KeyDown keyCode={ESCAPE_KEY} onKeyDown={onDissmiss} />
