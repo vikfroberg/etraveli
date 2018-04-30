@@ -1,6 +1,9 @@
 ## My implementation of
 https://gist.github.com/kevva/c180579887a1c500074d1ede97e6553d
 
+## Instructions
+`npm run start`
+
 ## Disclaimer
 - It uses union types (daggy) because they are great for making wrong states impossible [See this talk](https://www.youtube.com/watch?v=IcgmSRJHu_8)
 - It uses "inline styles" because you avoid InnerOuterWrapper components and it's easy to change/delete
