@@ -3,9 +3,11 @@ import request from "axios";
 import Maybe from "../data/maybe";
 import RemoteData from "../data/remote-data";
 import daggy from "daggy";
+import queryString from "query-string";
 import * as R from "ramda";
 import KeyDown, { ESCAPE_KEY } from "../components/key-down";
 import ClickOutside from "../components/click-outside";
+import { Link } from "../components/link";
 import {
   FlexColumn,
   FlexRow,
@@ -13,10 +15,6 @@ import {
   InlineBlock,
   Input,
 } from "../components/ui";
-
-// TODO
-// - router server side
-// - release date use new date
 
 // DATA
 
@@ -26,14 +24,39 @@ const Sort = daggy.taggedSum("Sort", {
   Year: [],
 });
 
+Sort.fromString = function(string) {
+  switch (string) {
+    case "none":
+      return Sort.None;
+    case "episode":
+      return Sort.Episode;
+    case "year":
+      return Sort.Year;
+    default:
+      return Sort.None;
+  }
+};
+
+Sort.prototype.toString = function() {
+  return this.cata({
+    None: () => "none",
+    Episode: () => "episode",
+    Year: () => "year",
+  });
+};
+
 Sort.prototype.compare = function(a, b) {
   return this.cata({
     None: () => 0,
     Episode: () => a.episode - b.episode,
     Year: () => {
-      const aDate = new Date(a.releaseDate);
-      const bDate = new Date(b.releaseDate);
-      return bDate > aDate ? -1 : bDate < aDate ? 1 : 0;
+      if (b.releaseDate > a.releaseDate) {
+        return -1;
+      } else if (b.releaseDate < a.releaseDate) {
+        return 1;
+      } else {
+        return 0;
+      }
     },
   });
 };
@@ -50,14 +73,8 @@ const getMoviesFailure = err => state => ({
   remoteMovies: RemoteData.Failure(err),
 });
 
-const selectMovie = movie => state => ({
-  ...state,
-  selectedMovie: Maybe.Just(movie),
-});
-
 const searchInputChanged = searchInput => state => ({
   ...state,
-  selectedMovie: Maybe.Nothing,
   searchInput,
 });
 
@@ -81,24 +98,34 @@ const sortByChanged = sortBy => state => ({
 class MoviesPage extends Component {
   state = {
     remoteMovies: RemoteData.Loading,
-    selectedMovie: Maybe.Nothing,
     searchInput: "",
     dropdown: false,
-    sortBy: Sort.None,
   };
+
   componentDidMount() {
     request
       .get("https://star-wars-api.herokuapp.com/films")
       .then(res => this.setState(getMoviesSuccess(res)))
       .catch(err => this.setState(getMoviesFailure(err)));
   }
+
   render() {
+    const maybeSelectedId = Maybe.from(this.props.match.params.id).map(id =>
+      parseInt(id, 10),
+    );
+
+    const maybeSortBy = Maybe.from(
+      queryString.parseUrl(window.location.hash).query.sort,
+    ).map(Sort.fromString);
+
+    const sortBy = maybeSortBy.withDefault(Sort.None);
+
     return (
       <FlexColumn $css={{ height: "100%" }}>
         <Header>
           <Dropdown
             open={this.state.dropdown}
-            sortBy={this.state.sortBy}
+            sortBy={sortBy}
             onToggle={() => this.setState(toggleDropdown)}
             onDissmiss={() => this.setState(closeDropdown)}
             onSortByChanged={sort => this.setState(sortByChanged(sort))}
@@ -112,13 +139,17 @@ class MoviesPage extends Component {
           left={
             <MovieListView
               remoteMovies={this.state.remoteMovies}
-              sortBy={this.state.sortBy}
+              sortBy={sortBy}
               searchInput={this.state.searchInput}
-              selectedMovie={this.state.selectedMovie}
-              onClickMovie={movie => this.setState(selectMovie(movie))}
+              maybeSelectedId={maybeSelectedId}
             />
           }
-          right={<MovieDetailView selectedMovie={this.state.selectedMovie} />}
+          right={
+            <MovieDetailView
+              remoteMovies={this.state.remoteMovies}
+              maybeSelectedId={maybeSelectedId}
+            />
+          }
         />
       </FlexColumn>
     );
@@ -127,15 +158,9 @@ class MoviesPage extends Component {
 
 // LIST VIEW
 
-function MovieListView({
-  selectedMovie,
-  remoteMovies,
-  sortBy,
-  searchInput,
-  onClickMovie,
-}) {
+function MovieListView({ maybeSelectedId, remoteMovies, sortBy, searchInput }) {
   const sortMovies = R.sort((a, b) => sortBy.compare(a, b));
-  const filterMoviesBySearch = R.filter(searchTitle(searchInput));
+  const filterMoviesBySearch = R.filter(matchTitleLike(searchInput));
 
   const remoteFilteredMovies = remoteMovies
     .map(sortMovies)
@@ -151,8 +176,7 @@ function MovieListView({
               <MovieListItem
                 key={movie.id}
                 movie={movie}
-                selectedMovie={selectedMovie}
-                onClickMovie={onClickMovie}
+                maybeSelectedId={maybeSelectedId}
               />
             ));
           } else {
@@ -177,68 +201,94 @@ function MovieListFailure() {
   return <Block $css={{ padding: "20px" }}>Failed to load movies</Block>;
 }
 
-function MovieListItem({ selectedMovie, onClickMovie, movie }) {
+function MovieListItem({ maybeSelectedId, movie }) {
   return (
-    <Block
-      $css={{
-        ":hover": { backgroundColor: "#f8f8f9" },
-        borderBottomColor: "#ebecf0",
-        borderBottomWidth: "1px",
-        borderBottomStyle: "solid",
-        padding: "20px",
-        cursor: "pointer",
-        backgroundColor: selectedMovie.cata({
-          Just: ({ id }) => (movie.id === id ? "#f8f8f9" : "#fff"),
-          Nothing: () => "#fff",
-        }),
-      }}
-      key={movie.id}
-      onClick={() => onClickMovie(movie)}
-    >
-      <InlineBlock
+    <Link to={{ pathname: `/${movie.id}` }}>
+      <Block
         $css={{
-          marginRight: "25px",
-          textTransform: "uppercase",
+          ":hover": { backgroundColor: "#f8f8f9" },
+          borderBottomColor: "#ebecf0",
+          borderBottomWidth: "1px",
+          borderBottomStyle: "solid",
+          padding: "20px",
+          cursor: "pointer",
+          backgroundColor: maybeSelectedId.cata({
+            Just: id => (movie.id === id ? "#f8f8f9" : "#fff"),
+            Nothing: () => "#fff",
+          }),
         }}
+        key={movie.id}
       >
-        Episode {movie.episode}
-      </InlineBlock>
-      <InlineBlock $css={{ fontWeight: "bold" }}>{movie.title}</InlineBlock>
-      <InlineBlock $css={{ float: "right" }}>{movie.releaseDate}</InlineBlock>
-    </Block>
+        <InlineBlock
+          $css={{
+            marginRight: "25px",
+            textTransform: "uppercase",
+          }}
+        >
+          Episode {movie.episode}
+        </InlineBlock>
+        <InlineBlock $css={{ fontWeight: "bold" }}>{movie.title}</InlineBlock>
+        <InlineBlock $css={{ float: "right" }}>
+          {dateToString(movie.releaseDate)}
+        </InlineBlock>
+      </Block>
+    </Link>
   );
 }
 
 // DETAIL VIEW
 
-function MovieDetailView({ selectedMovie }) {
+function MovieDetailView({ remoteMovies, maybeSelectedId }) {
   return (
     <Block>
-      {selectedMovie.cata({
-        Nothing: () => (
-          <Block
-            $css={{
-              padding: "20px",
-              fontWeight: "bold",
-            }}
-          >
-            No movie selected
-          </Block>
-        ),
-        Just: movie => (
-          <Block
-            $css={{
-              padding: "20px",
-            }}
-          >
-            <h1>{movie.title}</h1>
-            <p>{movie.openingCrawl}</p>
-            <p>Directed by: {movie.director}</p>
-          </Block>
-        ),
+      {remoteMovies.cata({
+        Loading: () => <MovieDetailLoading />,
+        Success: movies =>
+          maybeSelectedId.cata({
+            Just: id => (
+              <MovieDetailSuccess
+                maybeMovie={maybeFind(m => m.id === id, movies)}
+              />
+            ),
+            Nothing: () => <MovieDetailNotSelected />,
+          }),
+        Failure: () => <MovieDetailFailure />,
       })}
     </Block>
   );
+}
+
+function MovieDetailSuccess({ maybeMovie }) {
+  return maybeMovie.cata({
+    Just: movie => (
+      <Block
+        $css={{
+          padding: "20px",
+        }}
+      >
+        <h1>{movie.title}</h1>
+        <p>{movie.openingCrawl}</p>
+        <p>Directed by: {movie.director}</p>
+      </Block>
+    ),
+    Nothing: () => (
+      <Block $css={{ padding: "20px" }}>
+        Could not find a movie with that id
+      </Block>
+    ),
+  });
+}
+
+function MovieDetailNotSelected() {
+  return <Block $css={{ padding: "20px" }}>No movie selected</Block>;
+}
+
+function MovieDetailFailure() {
+  return <Block $css={{ padding: "20px" }}>Failed to load movie</Block>;
+}
+
+function MovieDetailLoading() {
+  return <Block $css={{ padding: "20px" }}>Loading...</Block>;
 }
 
 // CONTENT
@@ -296,19 +346,19 @@ function Dropdown({ onDissmiss, onToggle, open, onSortByChanged, sortBy }) {
           <Block>
             <DropdownContentItem
               active={sortBy === Sort.None}
-              onClick={() => onSortByChanged(Sort.None)}
+              param={Sort.None.toString()}
             >
               None
             </DropdownContentItem>
             <DropdownContentItem
               active={sortBy === Sort.Episode}
-              onClick={() => onSortByChanged(Sort.Episode)}
+              param={Sort.Episode.toString()}
             >
               Episode
             </DropdownContentItem>
             <DropdownContentItem
               active={sortBy === Sort.Year}
-              onClick={() => onSortByChanged(Sort.Year)}
+              param={Sort.Year.toString()}
             >
               Year
             </DropdownContentItem>
@@ -393,23 +443,27 @@ function DropdownContentHeader({ children, onDissmiss }) {
   );
 }
 
-function DropdownContentItem({ active, children, onClick }) {
+function DropdownContentItem({ active, children, param }) {
   return (
-    <Block
-      $css={{
-        borderBottomColor: "#f1f2f4",
-        borderBottomWidth: "1px",
-        borderBottomStyle: "solid",
-        paddingLeft: "30px",
-        paddingTop: "10px",
-        paddingBottom: "10px",
-        cursor: "pointer",
-        backgroundColor: active ? "#f8f8f9" : "#fff",
-      }}
-      onClick={onClick}
-    >
-      {children}
-    </Block>
+    <Link to={{ query: { sort: param } }}>
+      <Block
+        $css={{
+          borderBottomColor: "#f1f2f4",
+          borderBottomWidth: "1px",
+          borderBottomStyle: "solid",
+          paddingLeft: "30px",
+          paddingTop: "10px",
+          paddingBottom: "10px",
+          cursor: "pointer",
+          backgroundColor: active ? "#f8f8f9" : "#fff",
+          ":hover": {
+            backgroundColor: "#f8f8f9",
+          },
+        }}
+      >
+        {children}
+      </Block>
+    </Link>
   );
 }
 
@@ -441,7 +495,18 @@ function SearchInput({ onChange, value }) {
 
 // HELPERS
 
-const searchTitle = input => movie =>
+const maybeFind = R.curry((cb, xs) => {
+  return Maybe.from(xs.find(cb));
+});
+
+function dateToString(dateObj) {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const date = dateObj.getDate();
+  return `${year}-${month}-${date}`;
+}
+
+const matchTitleLike = input => movie =>
   movie.title.toLowerCase().indexOf(input.toLowerCase()) !== -1;
 
 function decodeMovies(data) {
@@ -449,7 +514,7 @@ function decodeMovies(data) {
     id: movie.id,
     title: movie.fields.title,
     episode: movie.fields.episode_id,
-    releaseDate: movie.fields.release_date,
+    releaseDate: new Date(movie.fields.release_date),
     openingCrawl: movie.fields.opening_crawl,
     director: movie.fields.director,
   }));
